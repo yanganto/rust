@@ -712,9 +712,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     if tys.len() == 0 { StructKind::AlwaysSized } else { StructKind::MaybeUnsized };
 
                 univariant(
-                    &tys.iter()
-                        .map(|k| self.layout_of(k.expect_ty()))
-                        .collect::<Result<Vec<_>, _>>()?,
+                    &tys.iter().map(|k| self.layout_of(k)).collect::<Result<Vec<_>, _>>()?,
                     &ReprOptions::default(),
                     kind,
                 )?
@@ -1319,9 +1317,8 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     // Try to use a ScalarPair for all tagged enums.
                     let mut common_prim = None;
                     for (field_layouts, layout_variant) in iter::zip(&variants, &layout_variants) {
-                        let offsets = match layout_variant.fields {
-                            FieldsShape::Arbitrary { ref offsets, .. } => offsets,
-                            _ => bug!(),
+                        let FieldsShape::Arbitrary { ref offsets, .. } = layout_variant.fields else {
+                            bug!();
                         };
                         let mut fields =
                             iter::zip(field_layouts, offsets).filter(|p| !p.0.is_zst());
@@ -1571,9 +1568,8 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
         let tcx = self.tcx;
         let subst_field = |ty: Ty<'tcx>| ty.subst(tcx, substs);
 
-        let info = match tcx.generator_layout(def_id) {
-            None => return Err(LayoutError::Unknown(ty)),
-            Some(info) => info,
+        let Some(info) = tcx.generator_layout(def_id) else {
+            return Err(LayoutError::Unknown(ty));
         };
         let (ineligible_locals, assignments) = self.generator_saved_local_eligibility(&info);
 
@@ -1676,9 +1672,8 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                 )?;
                 variant.variants = Variants::Single { index };
 
-                let (offsets, memory_index) = match variant.fields {
-                    FieldsShape::Arbitrary { offsets, memory_index } => (offsets, memory_index),
-                    _ => bug!(),
+                let FieldsShape::Arbitrary { offsets, memory_index } = variant.fields else {
+                    bug!();
                 };
 
                 // Now, stitch the promoted and variant-only fields back together in
@@ -2385,7 +2380,7 @@ where
                     }
                 },
 
-                ty::Tuple(tys) => TyMaybeWithLayout::Ty(tys[i].expect_ty()),
+                ty::Tuple(tys) => TyMaybeWithLayout::Ty(tys[i]),
 
                 // ADTs.
                 ty::Adt(def, substs) => {
@@ -3015,7 +3010,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             if let Some(input) = sig.inputs().last() {
                 if let ty::Tuple(tupled_arguments) = input.kind() {
                     inputs = &sig.inputs()[0..sig.inputs().len() - 1];
-                    tupled_arguments.iter().map(|k| k.expect_ty()).collect()
+                    tupled_arguments
                 } else {
                     bug!(
                         "argument to function with \"rust-call\" ABI \
@@ -3030,7 +3025,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             }
         } else {
             assert!(sig.c_variadic || extra_args.is_empty());
-            extra_args.to_vec()
+            extra_args
         };
 
         let target = &self.tcx.sess.target;
@@ -3158,8 +3153,8 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             ret: arg_of(sig.output(), None)?,
             args: inputs
                 .iter()
-                .cloned()
-                .chain(extra_args)
+                .copied()
+                .chain(extra_args.iter().copied())
                 .chain(caller_location)
                 .enumerate()
                 .map(|(i, ty)| arg_of(ty, Some(i)))

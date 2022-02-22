@@ -53,7 +53,7 @@ fn eval_body_using_ecx<'mir, 'tcx>(
 
     trace!(
         "eval_body_using_ecx: pushing stack frame for global: {}{}",
-        with_no_trimmed_paths(|| ty::tls::with(|tcx| tcx.def_path_str(cid.instance.def_id()))),
+        with_no_trimmed_paths!(ty::tls::with(|tcx| tcx.def_path_str(cid.instance.def_id()))),
         cid.promoted.map_or_else(String::new, |p| format!("::promoted[{:?}]", p))
     );
 
@@ -231,9 +231,8 @@ pub fn eval_to_const_value_raw_provider<'tcx>(
     // Catch such calls and evaluate them instead of trying to load a constant's MIR.
     if let ty::InstanceDef::Intrinsic(def_id) = key.value.instance.def {
         let ty = key.value.instance.ty(tcx, key.param_env);
-        let substs = match ty.kind() {
-            ty::FnDef(_, substs) => substs,
-            _ => bug!("intrinsic with type {:?}", ty),
+        let ty::FnDef(_, substs) = ty.kind() else {
+            bug!("intrinsic with type {:?}", ty);
         };
         return eval_nullary_intrinsic(tcx, key.param_env, def_id, substs).map_err(|error| {
             let span = tcx.def_span(def_id);
@@ -274,7 +273,7 @@ pub fn eval_to_allocation_raw_provider<'tcx>(
         // The next two lines concatenated contain some discussion:
         // https://rust-lang.zulipchat.com/#narrow/stream/146212-t-compiler.2Fconst-eval/
         // subject/anon_const_instance_printing/near/135980032
-        let instance = with_no_trimmed_paths(|| key.value.instance.to_string());
+        let instance = with_no_trimmed_paths!(key.value.instance.to_string());
         trace!("const eval: {:?} ({})", key, instance);
     }
 
@@ -317,7 +316,7 @@ pub fn eval_to_allocation_raw_provider<'tcx>(
                     // the expression, leading to the const eval error.
                     let instance = &key.value.instance;
                     if !instance.substs.is_empty() {
-                        let instance = with_no_trimmed_paths(|| instance.to_string());
+                        let instance = with_no_trimmed_paths!(instance.to_string());
                         let msg = format!("evaluation of `{}` failed", instance);
                         Cow::from(msg)
                     } else {

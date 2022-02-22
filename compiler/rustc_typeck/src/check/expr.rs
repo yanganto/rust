@@ -622,15 +622,12 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             // the `enclosing_loops` field and let's coerce the
             // type of `expr_opt` into what is expected.
             let mut enclosing_breakables = self.enclosing_breakables.borrow_mut();
-            let ctxt = match enclosing_breakables.opt_find_breakable(target_id) {
-                Some(ctxt) => ctxt,
-                None => {
-                    // Avoid ICE when `break` is inside a closure (#65383).
-                    return tcx.ty_error_with_message(
-                        expr.span,
-                        "break was outside loop, but no error was emitted",
-                    );
-                }
+            let Some(ctxt) = enclosing_breakables.opt_find_breakable(target_id) else {
+                // Avoid ICE when `break` is inside a closure (#65383).
+                return tcx.ty_error_with_message(
+                    expr.span,
+                    "break was outside loop, but no error was emitted",
+                );
             };
 
             if let Some(ref mut coerce) = ctxt.coerce {
@@ -1294,7 +1291,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
         let elt_ts_iter = elts.iter().enumerate().map(|(i, e)| match flds {
             Some(fs) if i < fs.len() => {
-                let ety = fs[i].expect_ty();
+                let ety = fs[i];
                 self.check_expr_coercable_to_type(&e, ety, None);
                 ety
             }
@@ -1880,13 +1877,13 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     let fstr = field.as_str();
                     if let Ok(index) = fstr.parse::<usize>() {
                         if fstr == index.to_string() {
-                            if let Some(field_ty) = tys.get(index) {
+                            if let Some(&field_ty) = tys.get(index) {
                                 let adjustments = self.adjust_steps(&autoderef);
                                 self.apply_adjustments(base, adjustments);
                                 self.register_predicates(autoderef.into_obligations());
 
                                 self.write_field_index(expr.hir_id, index);
-                                return field_ty.expect_ty();
+                                return field_ty;
                             }
                         }
                     }

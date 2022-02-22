@@ -1841,6 +1841,15 @@ static_assert_size!(PlaceElem<'_>, 24);
 pub type ProjectionKind = ProjectionElem<(), ()>;
 
 rustc_index::newtype_index! {
+    /// A [newtype'd][wrapper] index type in the MIR [control-flow graph][CFG]
+    ///
+    /// A field (e.g., `f` in `_1.f`) is one variant of [`ProjectionElem`]. Conceptually,
+    /// rustc can identify that a field projection refers to either two different regions of memory
+    /// or the same one between the base and the 'projection element'.
+    /// Read more about projections in the [rustc-dev-guide][mir-datatypes]
+    /// [wrapper]: https://rustc-dev-guide.rust-lang.org/appendix/glossary.html#newtype
+    /// [CFG]: https://rustc-dev-guide.rust-lang.org/appendix/background.html#cfg
+    /// [mir-datatypes]: https://rustc-dev-guide.rust-lang.org/mir/index.html#mir-data-types
     pub struct Field {
         derive [HashStable]
         DEBUG_FORMAT = "field[{}]"
@@ -2524,7 +2533,7 @@ pub enum ConstantKind<'tcx> {
 
 impl<'tcx> Constant<'tcx> {
     pub fn check_static_ptr(&self, tcx: TyCtxt<'_>) -> Option<DefId> {
-        match self.literal.try_to_scalar() {
+        match self.literal.const_for_ty()?.val().try_to_scalar() {
             Some(Scalar::Ptr(ptr, _size)) => match tcx.global_alloc(ptr.provenance) {
                 GlobalAlloc::Static(def_id) => {
                     assert!(!tcx.is_thread_local_static(def_id));

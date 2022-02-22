@@ -24,7 +24,7 @@ fn sized_constraint_for_ty<'tcx>(
 
         Tuple(ref tys) => match tys.last() {
             None => vec![],
-            Some(ty) => sized_constraint_for_ty(tcx, adtdef, ty.expect_ty()),
+            Some(&ty) => sized_constraint_for_ty(tcx, adtdef, ty),
         },
 
         Adt(adt, substs) => {
@@ -49,10 +49,7 @@ fn sized_constraint_for_ty<'tcx>(
             // we know that `T` is Sized and do not need to check
             // it on the impl.
 
-            let sized_trait = match tcx.lang_items().sized_trait() {
-                Some(x) => x,
-                _ => return vec![ty],
-            };
+            let Some(sized_trait) = tcx.lang_items().sized_trait() else { return vec![ty] };
             let sized_predicate = ty::Binder::dummy(ty::TraitRef {
                 def_id: sized_trait,
                 substs: tcx.mk_substs_trait(ty, &[]),
@@ -464,9 +461,9 @@ pub fn conservative_is_privately_uninhabited_raw<'tcx>(
                 })
             })
         }
-        ty::Tuple(..) => {
+        ty::Tuple(fields) => {
             debug!("ty::Tuple(..) =>");
-            ty.tuple_fields().any(|ty| tcx.conservative_is_privately_uninhabited(param_env.and(ty)))
+            fields.iter().any(|ty| tcx.conservative_is_privately_uninhabited(param_env.and(ty)))
         }
         ty::Array(ty, len) => {
             debug!("ty::Array(ty, len) =>");

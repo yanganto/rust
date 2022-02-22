@@ -270,7 +270,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             debug!("deduce_sig_from_projection: arg_param_ty={:?}", arg_param_ty);
 
             match arg_param_ty.kind() {
-                ty::Tuple(tys) => tys.into_iter().map(|k| k.expect_ty()).collect::<Vec<_>>(),
+                &ty::Tuple(tys) => tys,
                 _ => return None,
             }
         } else {
@@ -286,7 +286,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
         let sig = projection.rebind(self.tcx.mk_fn_sig(
             input_tys.iter(),
-            &ret_param_ty,
+            ret_param_ty,
             false,
             hir::Unsafety::Normal,
             Abi::Rust,
@@ -676,12 +676,9 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
         // We do not expect any bound regions in our predicate, so
         // skip past the bound vars.
-        let predicate = match predicate.no_bound_vars() {
-            Some(p) => p,
-            None => {
-                debug!("deduce_future_output_from_projection: has late-bound regions");
-                return None;
-            }
+        let Some(predicate) = predicate.no_bound_vars() else {
+            debug!("deduce_future_output_from_projection: has late-bound regions");
+            return None;
         };
 
         // Check that this is a projection from the `Future` trait.

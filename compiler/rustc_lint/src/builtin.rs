@@ -2621,7 +2621,7 @@ impl<'tcx> LateLintPass<'tcx> for InvalidValue {
                 }
                 Tuple(..) => {
                     // Proceed recursively, check all fields.
-                    ty.tuple_fields().find_map(|field| ty_find_init_error(tcx, field, init))
+                    ty.tuple_fields().iter().find_map(|field| ty_find_init_error(tcx, field, init))
                 }
                 // Conservative fallback.
                 _ => None,
@@ -2634,7 +2634,7 @@ impl<'tcx> LateLintPass<'tcx> for InvalidValue {
             // We are extremely conservative with what we warn about.
             let conjured_ty = cx.typeck_results().expr_ty(expr);
             if let Some((msg, span)) =
-                with_no_trimmed_paths(|| ty_find_init_error(cx.tcx, conjured_ty, init))
+                with_no_trimmed_paths!(ty_find_init_error(cx.tcx, conjured_ty, init))
             {
                 cx.struct_span_lint(INVALID_VALUE, expr.span, |lint| {
                     let mut err = lint.build(&format!(
@@ -2934,7 +2934,7 @@ impl ClashingExternDeclarations {
                                 )
                         }
                         (Tuple(a_substs), Tuple(b_substs)) => {
-                            a_substs.types().eq_by(b_substs.types(), |a_ty, b_ty| {
+                            a_substs.iter().eq_by(b_substs.iter(), |a_ty, b_ty| {
                                 structurally_same_type_impl(seen_types, cx, a_ty, b_ty, ckind)
                             })
                         }

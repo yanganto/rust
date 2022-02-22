@@ -752,9 +752,8 @@ pub fn type_metadata<'ll, 'tcx>(cx: &CodegenCx<'ll, 'tcx>, t: Ty<'tcx>) -> &'ll 
                 prepare_enum_metadata(cx, t, def.did, unique_type_id, vec![]).finalize(cx)
             }
         },
-        ty::Tuple(elements) => {
-            let tys: Vec<_> = elements.iter().map(|k| k.expect_ty()).collect();
-            prepare_tuple_metadata(cx, t, &tys, unique_type_id, NO_SCOPE_METADATA).finalize(cx)
+        ty::Tuple(tys) => {
+            prepare_tuple_metadata(cx, t, tys, unique_type_id, NO_SCOPE_METADATA).finalize(cx)
         }
         // Type parameters from polymorphized functions.
         ty::Param(_) => MetadataCreationResult::new(param_type_metadata(cx, t), false),
@@ -766,18 +765,15 @@ pub fn type_metadata<'ll, 'tcx>(cx: &CodegenCx<'ll, 'tcx>, t: Ty<'tcx>) -> &'ll 
 
         if already_stored_in_typemap {
             // Also make sure that we already have a `TypeMap` entry for the unique type ID.
-            let metadata_for_uid = match type_map.find_metadata_for_unique_id(unique_type_id) {
-                Some(metadata) => metadata,
-                None => {
-                    bug!(
-                        "expected type metadata for unique \
-                               type ID '{}' to already be in \
-                               the `debuginfo::TypeMap` but it \
-                               was not. (Ty = {})",
-                        type_map.get_unique_type_id_as_string(unique_type_id),
-                        t
-                    );
-                }
+            let Some(metadata_for_uid) = type_map.find_metadata_for_unique_id(unique_type_id) else {
+                bug!(
+                    "expected type metadata for unique \
+                            type ID '{}' to already be in \
+                            the `debuginfo::TypeMap` but it \
+                            was not. (Ty = {})",
+                    type_map.get_unique_type_id_as_string(unique_type_id),
+                    t
+                );
             };
 
             match type_map.find_metadata_for_type(t) {

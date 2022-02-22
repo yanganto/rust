@@ -17,7 +17,7 @@ use rustc_data_structures::intern::Interned;
 use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use rustc_errors::ErrorReported;
 use rustc_hir as hir;
-use rustc_hir::def::DefKind;
+use rustc_hir::def::{CtorOf, DefKind, Res};
 use rustc_hir::def_id::DefId;
 use rustc_macros::HashStable;
 use rustc_query_system::ich::NodeIdHashingMode;
@@ -146,6 +146,37 @@ impl<'tcx> TyCtxt<'tcx> {
         hasher.finish()
     }
 
+    pub fn res_generics_def_id(self, res: Res) -> Option<DefId> {
+        match res {
+            Res::Def(DefKind::Ctor(CtorOf::Variant, _), def_id) => {
+                Some(self.parent(def_id).and_then(|def_id| self.parent(def_id)).unwrap())
+            }
+            Res::Def(DefKind::Variant | DefKind::Ctor(CtorOf::Struct, _), def_id) => {
+                Some(self.parent(def_id).unwrap())
+            }
+            // Other `DefKind`s don't have generics and would ICE when calling
+            // `generics_of`.
+            Res::Def(
+                DefKind::Struct
+                | DefKind::Union
+                | DefKind::Enum
+                | DefKind::Trait
+                | DefKind::OpaqueTy
+                | DefKind::TyAlias
+                | DefKind::ForeignTy
+                | DefKind::TraitAlias
+                | DefKind::AssocTy
+                | DefKind::Fn
+                | DefKind::AssocFn
+                | DefKind::AssocConst
+                | DefKind::Impl,
+                def_id,
+            ) => Some(def_id),
+            Res::Err => None,
+            _ => None,
+        }
+    }
+
     pub fn has_error_field(self, ty: Ty<'tcx>) -> bool {
         if let ty::Adt(def, substs) = *ty.kind() {
             for field in def.all_fields() {
@@ -217,7 +248,7 @@ impl<'tcx> TyCtxt<'tcx> {
                 }
 
                 ty::Tuple(tys) if let Some((&last_ty, _)) = tys.split_last() => {
-                    ty = last_ty.expect_ty();
+                    ty = last_ty;
                 }
 
                 ty::Tuple(_) => break,
@@ -288,9 +319,9 @@ impl<'tcx> TyCtxt<'tcx> {
                     }
                 }
                 (&Tuple(a_tys), &Tuple(b_tys)) if a_tys.len() == b_tys.len() => {
-                    if let Some(a_last) = a_tys.last() {
-                        a = a_last.expect_ty();
-                        b = b_tys.last().unwrap().expect_ty();
+                    if let Some(&a_last) = a_tys.last() {
+                        a = a_last;
+                        b = *b_tys.last().unwrap();
                     } else {
                         break;
                     }
@@ -715,7 +746,7 @@ impl<'tcx> Ty<'tcx> {
             | ty::FnDef(..)
             | ty::Error(_)
             | ty::FnPtr(_) => true,
-            ty::Tuple(_) => self.tuple_fields().all(|f| Self::is_trivially_freeze(f)),
+            ty::Tuple(fields) => fields.iter().all(Self::is_trivially_freeze),
             ty::Slice(elem_ty) | ty::Array(elem_ty, _) => elem_ty.is_trivially_freeze(),
             ty::Adt(..)
             | ty::Bound(..)
@@ -755,7 +786,7 @@ impl<'tcx> Ty<'tcx> {
             | ty::FnDef(..)
             | ty::Error(_)
             | ty::FnPtr(_) => true,
-            ty::Tuple(_) => self.tuple_fields().all(|f| Self::is_trivially_unpin(f)),
+            ty::Tuple(fields) => fields.iter().all(Self::is_trivially_unpin),
             ty::Slice(elem_ty) | ty::Array(elem_ty, _) => elem_ty.is_trivially_unpin(),
             ty::Adt(..)
             | ty::Bound(..)
@@ -1011,7 +1042,7 @@ pub fn needs_drop_components<'tcx>(
             }
         }
         // If any field needs drop, then the whole tuple does.
-        ty::Tuple(..) => ty.tuple_fields().try_fold(SmallVec::new(), move |mut acc, elem| {
+        ty::Tuple(fields) => fields.iter().try_fold(SmallVec::new(), move |mut acc, elem| {
             acc.extend(needs_drop_components(elem, target_layout)?);
             Ok(acc)
         }),
@@ -1061,7 +1092,7 @@ pub fn is_trivially_const_drop<'tcx>(ty: Ty<'tcx>) -> bool {
 
         ty::Array(ty, _) | ty::Slice(ty) => is_trivially_const_drop(ty),
 
-        ty::Tuple(tys) => tys.iter().all(|ty| is_trivially_const_drop(ty.expect_ty())),
+        ty::Tuple(tys) => tys.iter().all(|ty| is_trivially_const_drop(ty)),
     }
 }
 

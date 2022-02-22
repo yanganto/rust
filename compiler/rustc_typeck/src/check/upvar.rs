@@ -533,19 +533,16 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 base => bug!("Expected upvar, found={:?}", base),
             };
 
-            let min_cap_list = match root_var_min_capture_list.get_mut(&var_hir_id) {
-                None => {
-                    let mutability = self.determine_capture_mutability(&typeck_results, &place);
-                    let min_cap_list = vec![ty::CapturedPlace {
-                        place,
-                        info: capture_info,
-                        mutability,
-                        region: None,
-                    }];
-                    root_var_min_capture_list.insert(var_hir_id, min_cap_list);
-                    continue;
-                }
-                Some(min_cap_list) => min_cap_list,
+            let Some(min_cap_list) = root_var_min_capture_list.get_mut(&var_hir_id) else {
+                let mutability = self.determine_capture_mutability(&typeck_results, &place);
+                let min_cap_list = vec![ty::CapturedPlace {
+                    place,
+                    info: capture_info,
+                    mutability,
+                    region: None,
+                }];
+                root_var_min_capture_list.insert(var_hir_id, min_cap_list);
+                continue;
             };
 
             // Go through each entry in the current list of min_captures
@@ -1451,7 +1448,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 )
             }
 
-            ty::Tuple(..) => {
+            ty::Tuple(fields) => {
                 // Only Field projections can be applied to a tuple.
                 assert!(
                     captured_by_move_projs.iter().all(|projs| matches!(
@@ -1460,7 +1457,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     ))
                 );
 
-                base_path_ty.tuple_fields().enumerate().any(|(i, element_ty)| {
+                fields.iter().enumerate().any(|(i, element_ty)| {
                     let paths_using_field = captured_by_move_projs
                         .iter()
                         .filter_map(|projs| {

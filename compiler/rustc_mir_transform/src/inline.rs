@@ -118,9 +118,8 @@ impl<'tcx> Inliner<'tcx> {
                 continue;
             }
 
-            let callsite = match self.resolve_callsite(caller_body, bb, bb_data) {
-                None => continue,
-                Some(it) => it,
+            let Some(callsite) = self.resolve_callsite(caller_body, bb, bb_data) else {
+                continue;
             };
 
             let span = trace_span!("process_blocks", %callsite.callee, ?bb);
@@ -693,8 +692,7 @@ impl<'tcx> Inliner<'tcx> {
             // The `tmp0`, `tmp1`, and `tmp2` in our example abonve.
             let tuple_tmp_args = tuple_tys.iter().enumerate().map(|(i, ty)| {
                 // This is e.g., `tuple_tmp.0` in our example above.
-                let tuple_field =
-                    Operand::Move(tcx.mk_place_field(tuple, Field::new(i), ty.expect_ty()));
+                let tuple_field = Operand::Move(tcx.mk_place_field(tuple, Field::new(i), ty));
 
                 // Spill to a local to make e.g., `tmp0`.
                 self.create_temp_if_necessary(tuple_field, callsite, caller_body)

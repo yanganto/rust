@@ -443,9 +443,9 @@ impl<'a, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'a, 'tcx> {
                 {
                     // Missing generic type parameter bound.
                     let param_name = self_ty.to_string();
-                    let constraint = with_no_trimmed_paths(|| {
+                    let constraint = with_no_trimmed_paths!(
                         trait_pred.print_modifiers_and_trait_path().to_string()
-                    });
+                    );
                     if suggest_constraining_type_param(
                         self.tcx,
                         generics,
@@ -1301,7 +1301,7 @@ impl<'a, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'a, 'tcx> {
                     if tcx.fn_trait_kind_from_lang_item(trait_ref.def_id()).is_some() =>
                 {
                     tcx.mk_fn_sig(
-                        inputs.iter().map(|k| k.expect_ty()),
+                        inputs.iter(),
                         tcx.mk_ty_infer(ty::TyVar(ty::TyVid::from_u32(0))),
                         false,
                         hir::Unsafety::Normal,

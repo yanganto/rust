@@ -92,7 +92,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                     if !candidate_set.ambiguous && no_candidates_apply {
                         let trait_ref = stack.obligation.predicate.skip_binder().trait_ref;
                         let self_ty = trait_ref.self_ty();
-                        let (trait_desc, self_desc) = with_no_trimmed_paths(|| {
+                        let (trait_desc, self_desc) = with_no_trimmed_paths!({
                             let trait_desc = trait_ref.print_only_trait_path().to_string();
                             let self_desc = if self_ty.has_concrete_skeleton() {
                                 Some(self_ty.to_string())
@@ -389,7 +389,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         for bound in matching_bounds {
             // FIXME(oli-obk): it is suspicious that we are dropping the constness and
             // polarity here.
-            let wc = self.evaluate_where_clause(stack, bound.map_bound(|t| t.trait_ref))?;
+            let wc = self.where_clause_may_apply(stack, bound.map_bound(|t| t.trait_ref))?;
             if wc.may_apply() {
                 candidates.vec.push(ParamCandidate(bound));
             }
